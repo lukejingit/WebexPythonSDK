@@ -196,7 +196,7 @@ class MessagesAPI(object):
         for item in items:
             yield self._object_factory(OBJECT_TYPE, item)
 
-    def create(self, roomId=None, parentId=None, toPersonId=None,
+    def create(self, messageId=None, roomId=None, parentId=None, toPersonId=None,
                toPersonEmail=None, text=None, markdown=None, files=None,
                attachments=None, **request_parameters):
         """Post a message to a room.
@@ -206,6 +206,7 @@ class MessagesAPI(object):
         the message.
 
         Args:
+            messageId(basestring): Optional messageId to edit (rather than create).
             roomId(basestring): The room ID.
             toPersonId(basestring): The ID of the recipient when sending a
                 private 1:1 message.
@@ -235,6 +236,9 @@ class MessagesAPI(object):
                 contain a valid URL or path to a local file.
 
         """
+        if messageId is None:
+            messageId = request_parameters.get('messageId')
+        check_type(messageId, basestring, optional=True)
         check_type(roomId, basestring, optional=True)
         check_type(toPersonId, basestring, optional=True)
         check_type(toPersonEmail, basestring, optional=True)
@@ -245,7 +249,9 @@ class MessagesAPI(object):
         check_type(parentId, basestring, optional=True)
 
         if files:
-            if len(files) > 1:
+            if messageId != None:
+                raise ValueError("Editing messages with `files` is not supported.") 
+            elif len(files) > 1:
                 raise ValueError("The `files` parameter should be a list with "
                                  "exactly one (1) item. The files parameter "
                                  "is a list, which accepts multiple values to "
@@ -278,9 +284,11 @@ class MessagesAPI(object):
 
         # API request
         if not files or is_web_url(files[0]):
+            if messageId is None:
             # Standard JSON post
-            json_data = self._session.post(API_ENDPOINT, json=post_data)
-
+                json_data = self._session.post(API_ENDPOINT, json=post_data)
+            elif messageId is not None:
+                json_data = self._session.put(API_ENDPOINT+"/"+messageId, json=post_data)
         elif is_local_file(files[0]):
             # Multipart MIME post
             try:
